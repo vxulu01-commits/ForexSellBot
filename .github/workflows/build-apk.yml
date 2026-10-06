@@ -1,4 +1,4 @@
-name: Build ForexSellBot APK
+name: Build ForexSellBot v0.2
 
 on:
   workflow_dispatch:
@@ -92,8 +92,8 @@ jobs:
                   applicationId = "com.vxulu01.forexsellbot"
                   minSdk = 26
                   targetSdk = 35
-                  versionCode = 1
-                  versionName = "0.1"
+                  versionCode = 2
+                  versionName = "0.2"
               }
           }
 
@@ -137,31 +137,81 @@ jobs:
           package com.vxulu01.forexsellbot
 
           import android.os.Bundle
+          import android.graphics.Color
+          import android.view.Gravity
+          import android.widget.LinearLayout
           import android.widget.TextView
           import androidx.appcompat.app.AppCompatActivity
 
           class MainActivity : AppCompatActivity() {
+
+              private fun label(text: String, size: Float = 16f): TextView {
+                  return TextView(this).apply {
+                      this.text = text
+                      textSize = size
+                      setTextColor(Color.WHITE)
+                      setPadding(24, 18, 24, 18)
+                  }
+              }
+
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
 
-                  val view = TextView(this).apply {
-                      text = """
-                          ForexSellBot v0.1
-
-                          SHORT-TERM SELL MODE
-
-                          Demo mode
-                          Strategy engine: initializing…
-
-                          This first build is a safe demo shell.
-                          Live trading is not enabled.
-                      """.trimIndent()
-
-                      textSize = 20f
-                      setPadding(48, 80, 48, 48)
+                  val root = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(24, 24, 24, 24)
+                      setBackgroundColor(Color.rgb(15, 20, 28))
                   }
 
-                  setContentView(view)
+                  val title = label("ForexSellBot", 28f)
+                  title.gravity = Gravity.CENTER
+
+                  val version = label("v0.2  •  SHORT-TERM SELL", 15f)
+                  version.gravity = Gravity.CENTER
+
+                  val demo = label("DEMO MODE — NO LIVE TRADING", 14f)
+                  demo.gravity = Gravity.CENTER
+                  demo.setTextColor(Color.YELLOW)
+
+                  root.addView(title)
+                  root.addView(version)
+                  root.addView(demo)
+
+                  root.addView(label("━━━━━━━━━━━━━━━━━━━━", 14f))
+
+                  root.addView(label("PAIR", 13f))
+                  root.addView(label("EUR/USD", 22f))
+
+                  root.addView(label("TIMEFRAME", 13f))
+                  root.addView(label("5 MINUTES", 20f))
+
+                  root.addView(label("SIGNAL", 13f))
+                  val signal = label("SELL", 32f)
+                  signal.gravity = Gravity.CENTER
+                  signal.setTextColor(Color.rgb(255, 90, 90))
+                  root.addView(signal)
+
+                  root.addView(label("SIGNAL STRENGTH     78%", 18f))
+                  root.addView(label("━━━━━━━━━━━━━━━━━━━━", 14f))
+
+                  root.addView(label("ENTRY ZONE", 13f))
+                  root.addView(label("1.08420 – 1.08460", 20f))
+
+                  root.addView(label("STOP LOSS", 13f))
+                  root.addView(label("1.08540", 20f))
+
+                  root.addView(label("TAKE PROFIT 1", 13f))
+                  root.addView(label("1.08240", 20f))
+
+                  root.addView(label("TAKE PROFIT 2", 13f))
+                  root.addView(label("1.08080", 20f))
+
+                  root.addView(label("RISK / REWARD     1 : 2.0", 18f))
+
+                  root.addView(label("━━━━━━━━━━━━━━━━━━━━", 14f))
+                  root.addView(label("Strategy status: DEMO / SIMULATION", 14f))
+
+                  setContentView(root)
               }
           }
           EOF
@@ -172,5 +222,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ForexSellBot-v0.1
+          name: ForexSellBot-v0.2
           path: app/build/outputs/apk/debug/app-debug.apk
