@@ -1,4 +1,4 @@
-name: Build ForexSellBot v0.3
+name: Build ForexSellBot v0.4
 
 on:
   workflow_dispatch:
@@ -92,8 +92,8 @@ jobs:
                   applicationId = "com.vxulu01.forexsellbot"
                   minSdk = 26
                   targetSdk = 35
-                  versionCode = 3
-                  versionName = "0.3"
+                  versionCode = 4
+                  versionName = "0.4"
               }
           }
 
@@ -107,6 +107,8 @@ jobs:
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
 
               <application
                   android:allowBackup="true"
@@ -155,12 +157,20 @@ jobs:
           import android.widget.LinearLayout
           import android.widget.TextView
           import androidx.appcompat.app.AppCompatActivity
+          import org.json.JSONObject
+          import java.net.HttpURLConnection
+          import java.net.URL
+          import kotlin.math.abs
+          import kotlin.math.max
+          import kotlin.math.min
 
           class MainActivity : AppCompatActivity() {
 
               private lateinit var signalText: TextView
               private lateinit var strengthText: TextView
               private lateinit var detailsText: TextView
+              private lateinit var statusText: TextView
+              private lateinit var refreshButton: Button
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -172,7 +182,7 @@ jobs:
 
                   val root = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
-                      setPadding(40, 50, 40, 40)
+                      setPadding(32, 45, 32, 35)
                       gravity = Gravity.CENTER_HORIZONTAL
                   }
 
@@ -183,21 +193,23 @@ jobs:
                   }
 
                   val version = TextView(this).apply {
-                      text = "v0.3 • SHORT-TERM SELL"
+                      text = "v0.4 • LIVE MARKET ANALYSIS"
                       textSize = 16f
                       gravity = Gravity.CENTER
                   }
 
-                  val demo = TextView(this).apply {
-                      text = "DEMO MODE — NO LIVE TRADING"
+                  statusText = TextView(this).apply {
+                      text = "Connecting to market data..."
                       textSize = 15f
                       gravity = Gravity.CENTER
+                      setPadding(0, 15, 0, 10)
                   }
 
                   signalText = TextView(this).apply {
-                      textSize = 32f
+                      text = "..."
+                      textSize = 34f
                       gravity = Gravity.CENTER
-                      setPadding(0, 35, 0, 10)
+                      setPadding(0, 25, 0, 8)
                   }
 
                   strengthText = TextView(this).apply {
@@ -206,12 +218,12 @@ jobs:
                   }
 
                   detailsText = TextView(this).apply {
-                      textSize = 17f
-                      setPadding(0, 30, 0, 30)
+                      textSize = 16f
+                      setPadding(0, 25, 0, 25)
                   }
 
-                  val refresh = Button(this).apply {
-                      text = "REFRESH ANALYSIS"
+                  refreshButton = Button(this).apply {
+                      text = "REFRESH MARKET DATA"
                       setOnClickListener {
                           runAnalysis()
                       }
@@ -219,90 +231,426 @@ jobs:
 
                   root.addView(title)
                   root.addView(version)
-                  root.addView(demo)
+                  root.addView(statusText)
                   root.addView(signalText)
                   root.addView(strengthText)
                   root.addView(detailsText)
-                  root.addView(refresh)
+                  root.addView(refreshButton)
 
                   setContentView(root)
               }
 
               private fun runAnalysis() {
 
-                  // DEMO strategy engine.
-                  // This version simulates technical-analysis scoring.
-                  // It does NOT connect to a broker or execute trades.
+                  refreshButton.isEnabled = false
+                  statusText.text = "Downloading EUR/USD 5-minute candles..."
+                  signalText.text = "..."
+                  strengthText.text = ""
+                  detailsText.text = ""
 
-                  val trendScore = 82
-                  val momentumScore = 76
-                  val rsiScore = 74
-                  val resistanceScore = 80
-                  val candleScore = 72
+                  Thread {
 
-                  val total =
-                      (trendScore +
-                       momentumScore +
-                       rsiScore +
-                       resistanceScore +
-                       candleScore) / 5
+                      try {
 
-                  if (total >= 75) {
+                          val closes = downloadPrices()
 
-                      signalText.text = "SELL"
-                      signalText.setTextColor(Color.rgb(190, 30, 30))
+                          if (closes.size < 50) {
+                              throw Exception("Not enough market candles received.")
+                          }
 
-                      strengthText.text =
-                          "Signal strength: $total%"
+                          val result = calculateStrategy(closes)
 
-                      detailsText.text = """
-                          PAIR: EUR/USD
-                          TIMEFRAME: 5 MINUTES
+                          runOnUiThread {
+                              showResult(result)
+                          }
 
-                          Trend: Bearish
-                          Momentum: Bearish
-                          RSI: Overbought / turning down
-                          Resistance: Rejection detected
-                          Candle: Bearish confirmation
+                      } catch (e: Exception) {
 
-                          ENTRY ZONE
-                          1.08420 – 1.08460
+                          runOnUiThread {
 
-                          STOP LOSS
-                          1.08540
+                              statusText.text = "Market data unavailable"
 
-                          TAKE PROFIT 1
-                          1.08240
+                              signalText.text = "WAIT"
+                              signalText.setTextColor(Color.DKGRAY)
 
-                          TAKE PROFIT 2
-                          1.08080
+                              strengthText.text = "No reliable signal"
 
-                          RISK / REWARD
-                          Approximately 1 : 2.0
+                              detailsText.text = """
+                                  EUR/USD
+                                  5-MINUTE TIMEFRAME
 
-                          STRATEGY STATUS
-                          DEMO / SIMULATION
-                      """.trimIndent()
+                                  The app could not obtain enough
+                                  live market candles.
 
-                  } else {
+                                  Check your internet connection
+                                  and press REFRESH MARKET DATA.
 
-                      signalText.text = "WAIT"
-                      signalText.setTextColor(Color.DKGRAY)
+                                  No trade signal is generated
+                                  when market data is unavailable.
 
-                      strengthText.text =
-                          "Signal strength: $total%"
+                                  DEMO / SIMULATION
+                              """.trimIndent()
 
-                      detailsText.text = """
-                          PAIR: EUR/USD
-                          TIMEFRAME: 5 MINUTES
+                              refreshButton.isEnabled = true
+                          }
+                      }
 
-                          Conditions are not strong
-                          enough for a short-term sell.
+                  }.start()
+              }
 
-                          STRATEGY STATUS
-                          DEMO / SIMULATION
-                      """.trimIndent()
+              private fun downloadPrices(): List<Double> {
+
+                  val url = URL(
+                      "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X" +
+                      "?interval=5m&range=1d"
+                  )
+
+                  val connection =
+                      url.openConnection() as HttpURLConnection
+
+                  connection.requestMethod = "GET"
+                  connection.connectTimeout = 10000
+                  connection.readTimeout = 10000
+                  connection.setRequestProperty(
+                      "User-Agent",
+                      "Mozilla/5.0"
+                  )
+
+                  try {
+
+                      if (connection.responseCode != 200) {
+                          throw Exception(
+                              "HTTP ${connection.responseCode}"
+                          )
+                      }
+
+                      val response =
+                          connection.inputStream
+                              .bufferedReader()
+                              .use { it.readText() }
+
+                      val root = JSONObject(response)
+
+                      val result =
+                          root.getJSONObject("chart")
+                              .getJSONArray("result")
+                              .getJSONObject(0)
+
+                      val quote =
+                          result.getJSONObject("indicators")
+                              .getJSONArray("quote")
+                              .getJSONObject(0)
+
+                      val closes = quote.getJSONArray("close")
+
+                      val prices = mutableListOf<Double>()
+
+                      for (i in 0 until closes.length()) {
+
+                          if (!closes.isNull(i)) {
+                              val value = closes.getDouble(i)
+
+                              if (value.isFinite() && value > 0) {
+                                  prices.add(value)
+                              }
+                          }
+                      }
+
+                      return prices
+
+                  } finally {
+                      connection.disconnect()
                   }
+              }
+
+              private data class StrategyResult(
+                  val signal: String,
+                  val strength: Int,
+                  val price: Double,
+                  val emaFast: Double,
+                  val emaSlow: Double,
+                  val rsi: Double,
+                  val macd: Double,
+                  val resistance: Double,
+                  val entryLow: Double,
+                  val entryHigh: Double,
+                  val stopLoss: Double,
+                  val takeProfit1: Double,
+                  val takeProfit2: Double
+              )
+
+              private fun calculateStrategy(
+                  prices: List<Double>
+              ): StrategyResult {
+
+                  val price = prices.last()
+
+                  val ema9 = ema(prices, 9)
+                  val ema21 = ema(prices, 21)
+
+                  val rsi = calculateRsi(prices, 14)
+
+                  val ema12 = ema(prices, 12)
+                  val ema26 = ema(prices, 26)
+
+                  val macd = ema12 - ema26
+
+                  val recentStart =
+                      max(0, prices.size - 20)
+
+                  val recent =
+                      prices.subList(recentStart, prices.size)
+
+                  val resistance =
+                      recent.maxOrNull() ?: price
+
+                  var score = 0
+
+                  // Trend
+                  if (ema9 < ema21) {
+                      score += 25
+                  }
+
+                  // Momentum
+                  if (macd < 0) {
+                      score += 20
+                  }
+
+                  // RSI
+                  if (rsi >= 50 && rsi <= 70) {
+                      score += 15
+                  } else if (rsi > 70) {
+                      score += 20
+                  }
+
+                  // Price near resistance
+                  val distance =
+                      abs(resistance - price) / price
+
+                  if (distance < 0.0025) {
+                      score += 20
+                  }
+
+                  // Recent bearish movement
+                  if (prices.size >= 4) {
+
+                      val previous =
+                          prices[prices.size - 4]
+
+                      if (price < previous) {
+                          score += 20
+                      }
+                  }
+
+                  score = min(100, score)
+
+                  val sell =
+                      score >= 65 &&
+                      ema9 < ema21 &&
+                      macd < 0
+
+                  val entryLow =
+                      price * 0.9995
+
+                  val entryHigh =
+                      price * 1.0005
+
+                  val riskDistance =
+                      max(
+                          price * 0.0015,
+                          abs(resistance - price) * 0.8
+                      )
+
+                  val stopLoss =
+                      price + riskDistance
+
+                  val takeProfit1 =
+                      price - riskDistance * 1.5
+
+                  val takeProfit2 =
+                      price - riskDistance * 2.0
+
+                  return StrategyResult(
+                      signal =
+                          if (sell) "SELL" else "WAIT",
+                      strength = score,
+                      price = price,
+                      emaFast = ema9,
+                      emaSlow = ema21,
+                      rsi = rsi,
+                      macd = macd,
+                      resistance = resistance,
+                      entryLow = entryLow,
+                      entryHigh = entryHigh,
+                      stopLoss = stopLoss,
+                      takeProfit1 = takeProfit1,
+                      takeProfit2 = takeProfit2
+                  )
+              }
+
+              private fun ema(
+                  prices: List<Double>,
+                  period: Int
+              ): Double {
+
+                  if (prices.size < period) {
+                      return prices.last()
+                  }
+
+                  val multiplier =
+                      2.0 / (period + 1)
+
+                  var value = prices
+                      .take(period)
+                      .average()
+
+                  for (i in period until prices.size) {
+
+                      value =
+                          ((prices[i] - value) * multiplier) +
+                          value
+                  }
+
+                  return value
+              }
+
+              private fun calculateRsi(
+                  prices: List<Double>,
+                  period: Int
+              ): Double {
+
+                  if (prices.size <= period) {
+                      return 50.0
+                  }
+
+                  var gains = 0.0
+                  var losses = 0.0
+
+                  for (i in 1..period) {
+
+                      val change =
+                          prices[i] - prices[i - 1]
+
+                      if (change >= 0) {
+                          gains += change
+                      } else {
+                          losses += abs(change)
+                      }
+                  }
+
+                  var averageGain =
+                      gains / period
+
+                  var averageLoss =
+                      losses / period
+
+                  for (i in period + 1 until prices.size) {
+
+                      val change =
+                          prices[i] - prices[i - 1]
+
+                      val gain =
+                          max(change, 0.0)
+
+                      val loss =
+                          max(-change, 0.0)
+
+                      averageGain =
+                          ((averageGain * (period - 1)) + gain) /
+                          period
+
+                      averageLoss =
+                          ((averageLoss * (period - 1)) + loss) /
+                          period
+                  }
+
+                  if (averageLoss == 0.0) {
+                      return 100.0
+                  }
+
+                  val rs =
+                      averageGain / averageLoss
+
+                  return 100.0 - (100.0 / (1.0 + rs))
+              }
+
+              private fun showResult(
+                  result: StrategyResult
+              ) {
+
+                  statusText.text =
+                      "LIVE MARKET DATA • EUR/USD • 5 MIN"
+
+                  signalText.text =
+                      result.signal
+
+                  signalText.setTextColor(
+                      if (result.signal == "SELL")
+                          Color.rgb(190, 30, 30)
+                      else
+                          Color.DKGRAY
+                  )
+
+                  strengthText.text =
+                      "Signal strength: ${result.strength}%"
+
+                  val signalMessage =
+                      if (result.signal == "SELL") {
+                          "SHORT-TERM SELL CONDITIONS DETECTED"
+                      } else {
+                          "WAIT — SELL CONDITIONS NOT STRONG ENOUGH"
+                      }
+
+                  detailsText.text = """
+                      $signalMessage
+
+                      CURRENT PRICE
+                      ${format(result.price)}
+
+                      EMA 9
+                      ${format(result.emaFast)}
+
+                      EMA 21
+                      ${format(result.emaSlow)}
+
+                      RSI (14)
+                      ${format(result.rsi)}
+
+                      MACD
+                      ${format(result.macd)}
+
+                      RECENT RESISTANCE
+                      ${format(result.resistance)}
+
+                      ENTRY ZONE
+                      ${format(result.entryLow)} – ${format(result.entryHigh)}
+
+                      STOP LOSS
+                      ${format(result.stopLoss)}
+
+                      TAKE PROFIT 1
+                      ${format(result.takeProfit1)}
+
+                      TAKE PROFIT 2
+                      ${format(result.takeProfit2)}
+
+                      STRATEGY STATUS
+                      LIVE DATA / SIMULATION
+
+                      No automatic trade execution.
+                  """.trimIndent()
+
+                  refreshButton.isEnabled = true
+              }
+
+              private fun format(
+                  value: Double
+              ): String {
+                  return String.format(
+                      java.util.Locale.US,
+                      "%.5f",
+                      value
+                  )
               }
           }
           EOF
@@ -313,5 +661,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ForexSellBot-v0.3
+          name: ForexSellBot-v0.4
           path: app/build/outputs/apk/debug/app-debug.apk
