@@ -142,4 +142,35 @@ jobs:
 
           class MainActivity : AppCompatActivity() {
               override fun onCreate(savedInstanceState: Bundle?) {
-                  super
+                  super.onCreate(savedInstanceState)
+
+                  val view = TextView(this).apply {
+                      text = """
+                          ForexSellBot v0.1
+
+                          SHORT-TERM SELL MODE
+
+                          Demo mode
+                          Strategy engine: initializing…
+
+                          This first build is a safe demo shell.
+                          Live trading is not enabled.
+                      """.trimIndent()
+
+                      textSize = 20f
+                      setPadding(48, 80, 48, 48)
+                  }
+
+                  setContentView(view)
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ForexSellBot-v0.1
+          path: app/build/outputs/apk/debug/app-debug.apk
